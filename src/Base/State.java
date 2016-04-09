@@ -1,7 +1,7 @@
 package Base;
 
 public enum State {
-    INPUT_START,
-    INPUT_FINISH,
-    ANIMATION
+    STATE_START,
+    STATE_FINISH,
+    STATE_ANIMATION
 }
