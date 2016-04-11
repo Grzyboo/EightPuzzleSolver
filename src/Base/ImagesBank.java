@@ -29,4 +29,12 @@ public class ImagesBank {
 
         return null;
     }
+
+    public int getImageWidth() {
+        return images[0].getWidth(null);
+    }
+
+    public int getImageHeight() {
+        return images[0].getHeight(null);
+    }
 }

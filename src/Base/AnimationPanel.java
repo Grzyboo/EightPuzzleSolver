@@ -1,10 +1,16 @@
 package Base;
 
+import Base.solver.Movement;
+import sun.awt.image.ImageWatched;
+
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
+import java.util.LinkedList;
 
 public class AnimationPanel extends JPanel {
     private static int NO_SQUARE_TO_BE_FRAMED = -1;
@@ -12,21 +18,46 @@ public class AnimationPanel extends JPanel {
     private State state;
     private ImagesBank imagesBank;
 
-    private int currentlySelectedSquare;
     private int stateBoard[];
+
+    private Timer timer;
+    private LinkedList<Movement> solutionMovesSequence = null;
+    private int tickCounter = 0;
+
+    private static final int MOVE_SPEED = 4;
 
     public AnimationPanel(int startBoard[]) {
         state = State.STATE_START;
         stateBoard = startBoard;
-        currentlySelectedSquare = 0;
+
+        //
+        solutionMovesSequence = new LinkedList<>();
+        solutionMovesSequence.add(Movement.UP);
+        solutionMovesSequence.add(Movement.UP);
+        solutionMovesSequence.add(Movement.LEFT);
+        solutionMovesSequence.add(Movement.DOWN);
+        solutionMovesSequence.add(Movement.LEFT);
+        solutionMovesSequence.add(Movement.UP);
+        solutionMovesSequence.add(Movement.RIGHT);
+        solutionMovesSequence.add(Movement.DOWN);
+        solutionMovesSequence.add(Movement.RIGHT);
+        solutionMovesSequence.add(Movement.DOWN);
+        solutionMovesSequence.add(Movement.LEFT);
+        solutionMovesSequence.add(Movement.LEFT);
+        solutionMovesSequence.add(Movement.UP);
+        solutionMovesSequence.add(Movement.UP);
+        solutionMovesSequence.add(Movement.RIGHT);
+        solutionMovesSequence.add(Movement.DOWN);
+        //
+
+        timer = new Timer(100, new TimerListener());
 
         imagesBank = new ImagesBank();
-
 
         addMouseListener(new MouseHandler());
     }
 
-    private int getSquareToBeFramed() {
+    public int getSquareToBeFramed() {
         for(int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
             if(stateBoard[i] == -1)
                 return i;
@@ -35,41 +66,23 @@ public class AnimationPanel extends JPanel {
         return NO_SQUARE_TO_BE_FRAMED;
     }
 
-    public int getCurrentlySelectedSquare() throws AllFieldsFilledException {
-        if(currentlySelectedSquare == -1) {
-            moveCurrentlySelectedSquare();
-            return currentlySelectedSquare;
-        }
-
-        if(stateBoard[currentlySelectedSquare] == -1)
-            return currentlySelectedSquare;
-
-        moveCurrentlySelectedSquare();
-        return currentlySelectedSquare;
-    }
-
-    public void moveCurrentlySelectedSquare() throws AllFieldsFilledException {
-        for(int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
-            if(stateBoard[i] == -1) {
-                currentlySelectedSquare = i;
-                return;
-            }
-        }
-
-        currentlySelectedSquare = -1;
-        throw new AllFieldsFilledException();
-    }
-
     public void setState(State state, int[] board) {
         this.state = state;
         stateBoard = board;
-        try {
-            moveCurrentlySelectedSquare();
-        } catch(AllFieldsFilledException ex) {
-            System.out.println(ex.toString());
-        } finally {
-            repaint();
+        repaint();
+
+        if(state == State.STATE_ANIMATION) {
+            tickCounter = 0;
+            timer.start();
         }
+        else {
+            timer.stop();
+        }
+
+    }
+
+    public void setMovesSequence(LinkedList<Movement> list) {
+        solutionMovesSequence = list;
     }
 
     protected void paintComponent(Graphics g) {
@@ -99,21 +112,114 @@ public class AnimationPanel extends JPanel {
     }
 
     private void drawPointingRectangle(Graphics g) {
-        if(currentlySelectedSquare == -1)
+        int squarePosition = getSquareToBeFramed();
+        if(squarePosition == NO_SQUARE_TO_BE_FRAMED)
             return;
 
         Image images[] = imagesBank.images;
-        int width = images[currentlySelectedSquare].getWidth(null);
-        int height = images[currentlySelectedSquare].getHeight(null);
-        int x = (currentlySelectedSquare % 3) * width;
-        int y = (currentlySelectedSquare / 3) * height;
+        int width = images[squarePosition].getWidth(null);
+        int height = images[squarePosition].getHeight(null);
+        int x = (squarePosition % 3) * width;
+        int y = (squarePosition / 3) * height;
 
         g.setColor(Color.RED);
         g.drawRect(x, y, width - 1, height - 1);
     }
 
-    private void paintAnimation(Graphics g) {
+    private Movement nextMove = null;
+    private int currentlyMovingPosition;
+    private int currentlyMovingX;
+    private int currentlyMovingY;
 
+    private void paintAnimation(Graphics g) {
+        if(solutionMovesSequence == null)
+            return;
+        Image images[] = imagesBank.images;
+
+        for(int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
+            int num = stateBoard[i];
+
+            if(num == -1)
+                num = 0;
+
+            if(i == currentlyMovingPosition) {
+                g.drawImage(images[num], currentlyMovingX, currentlyMovingY, null);
+            }
+            else {
+                int x = (i % 3) * images[num].getWidth(null);
+                int y = (i / 3) * images[num].getHeight(null);
+                g.drawImage(images[num], x, y, null);
+            }
+        }
+    }
+
+    private class TimerListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            ++tickCounter;
+            System.out.println(tickCounter);
+
+            if(tickCounter % 16 == 0) {
+
+                int zeroPosition = 0;
+                for (int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
+                    if (stateBoard[i] == 0)
+                        zeroPosition = i;
+                }
+
+                nextMove = solutionMovesSequence.removeFirst();
+
+                currentlyMovingPosition = zeroPosition;
+                currentlyMovingX = imagesBank.getImageWidth() * (currentlyMovingPosition % 3);
+                currentlyMovingX = imagesBank.getImageHeight() * (currentlyMovingPosition / 3);
+
+                switch (nextMove) {
+                    case UP:
+                        currentlyMovingPosition -= 3;
+                        break;
+                    case DOWN:
+                        currentlyMovingPosition += 3;
+                        break;
+                    case LEFT:
+                        --currentlyMovingPosition;
+                        break;
+                    case RIGHT:
+                        ++currentlyMovingPosition;
+                        break;
+                }
+                repaint();
+            }
+            else if(nextMove != null) {
+                switch (nextMove) {
+                    case UP:
+                        currentlyMovingY += MOVE_SPEED;
+                        break;
+                    case DOWN:
+                        currentlyMovingY -= MOVE_SPEED;
+                        break;
+                    case LEFT:
+                        currentlyMovingY += MOVE_SPEED;
+                        break;
+                    case RIGHT:
+                        currentlyMovingY -= MOVE_SPEED;
+                        break;
+                }
+
+                if(tickCounter % 16 == 15) {
+
+                    int zeroPosition = 0;
+                    for (int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
+                        if (stateBoard[i] == 0)
+                            zeroPosition = i;
+                    }
+
+                    int currentlyMoving = stateBoard[currentlyMovingPosition];
+                    stateBoard[currentlyMovingPosition] = 0;
+                    stateBoard[zeroPosition] = currentlyMoving;
+                }
+                else repaint();
+            }
+
+        }
     }
 
     public Dimension getPreferredSize() {
@@ -133,13 +239,5 @@ public class AnimationPanel extends JPanel {
             Point2D point = event.getPoint();
             System.out.println("x: " + point.getX() + " | y: " + point.getY());
         }
-    }
-}
-
-
-class AllFieldsFilledException extends Exception {
-    @Override
-    public String toString() {
-        return super.toString();
     }
 }

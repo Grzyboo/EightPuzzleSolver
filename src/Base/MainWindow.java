@@ -1,27 +1,43 @@
 package Base;
 
+import Base.solver.Movement;
 import Base.solver.Solver;
+import Base.solver.SolverThread;
 
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.LinkedList;
 
 public class MainWindow extends JFrame {
 
-    AnimationPanel animationPanel;
-    JButton[] numberButtons;
-    JButton solvingButton;
+    private AnimationPanel animationPanel;
+    private JButton[] numberButtons;
+    private JButton solvingButton;
 
-    int[] currentBoard;
+    private LoadingLabel loadingLabel;
 
-    int[] startBoard;
-    int[] endBoard;
+    private int[] currentBoard;
+
+    //private int[] startBoard = {5, 1, 7, 4, 8, 0, 2, 3, 6};
+    //private int[] endBoard = {1, 4, 7, 2, 5, 8, 3, 6, 0};
+    private int[] startBoard = {1, 2, 3, 4, 5, 6, 7, 8, 0};
+    private int[] endBoard = {4, 3, 2, 5, 0, 6, 1, 7, 8};
 
     public MainWindow() {
         setTitle("8-Puzzle Solver");
 
+        currentBoard = startBoard;
+        //initBoards();
+
+        createMainPanel();
+
+        pack();
+    }
+
+    private void initBoards() {
         startBoard = new int[9];
         endBoard = new int[9];
 
@@ -30,11 +46,6 @@ public class MainWindow extends JFrame {
             endBoard[i] = -1;
         }
 
-        currentBoard = startBoard;
-
-        createMainPanel();
-
-        pack();
     }
 
     private void createMainPanel() {
@@ -62,10 +73,21 @@ public class MainWindow extends JFrame {
         JPanel mapSettingPanel = createMapSettingPanel();
         menuPanel.add(mapSettingPanel);
 
+
+        JPanel solvingPanel = new JPanel();
+
+        loadingLabel = new LoadingLabel();
+        solvingPanel.add(loadingLabel);
+        loadingLabel.setVisible(false);
+
         solvingButton = new JButton("Solve");
         solvingButton.addActionListener(e -> solve());
-        solvingButton.setEnabled(false);
-        menuPanel.add(solvingButton);
+        //solvingButton.setEnabled(false);
+        solvingButton.setEnabled(true);
+        solvingPanel.add(solvingButton);
+
+
+        menuPanel.add(solvingPanel);
 
         return menuPanel;
     }
@@ -76,23 +98,22 @@ public class MainWindow extends JFrame {
 
         numberButtons = new JButton[ImagesBank.IMAGE_COUNT];
 
-        for(int i = 0; i < ImagesBank.IMAGE_COUNT; ++i) {
-            String name;
+        for(int i = 1; i < ImagesBank.IMAGE_COUNT; ++i)
+            addNumberButton(panel, i, "| " + i + " |");
 
-            if(i == 0)
-                name = "|   |";
-            else
-                name = "| " + i + " |";
+        addNumberButton(panel, 0, "|   |");
 
-            numberButtons[i] = new JButton(name);
-            numberButtons[i].addActionListener(new NumberChangingButtonsListener(i));
-            panel.add(numberButtons[i]);
-        }
 
         Border border = BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Maps setting");
         panel.setBorder(border);
 
         return panel;
+    }
+
+    private void addNumberButton(JPanel panel, int i, String label) {
+        numberButtons[i] = new JButton(label);
+        numberButtons[i].addActionListener(new NumberChangingButtonsListener(i));
+        panel.add(numberButtons[i]);
     }
 
     private JPanel createStateChangingPanel() {
@@ -115,13 +136,23 @@ public class MainWindow extends JFrame {
         group.add(buttonAnimation);
         panel.add(buttonAnimation);
 
+        //buttonAnimation.setEnabled(false);
+        buttonAnimation.setEnabled(true);
+
         return panel;
     }
 
     private void solve() {
-        Solver solver = new Solver(startBoard, endBoard);
-        System.out.println(solver.getSolutionString());
+        SolverThread solver = new SolverThread(this, new Solver(startBoard, endBoard));
+        solver.activate();
 
+        loadingLabel.setVisible(true);
+    }
+
+    public void receiveSolution(LinkedList<Movement> list) {
+        System.out.println(list.toString());
+        animationPanel.setMovesSequence(list);
+        loadingLabel.setVisible(false);
     }
 
     private class StateChangingButtonsListener implements ActionListener {
@@ -173,12 +204,10 @@ public class MainWindow extends JFrame {
         }
 
         public void actionPerformed(ActionEvent e) {
-            try {
-                currentBoard[animationPanel.getCurrentlySelectedSquare()] = number;
-                animationPanel.moveCurrentlySelectedSquare();
-            } catch (AllFieldsFilledException ex) {
 
-            }
+            int squarePosition = animationPanel.getSquareToBeFramed();
+
+            currentBoard[squarePosition] = number;
             animationPanel.repaint();
 
             numberButtons[number].setEnabled(false);
